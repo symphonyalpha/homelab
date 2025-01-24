@@ -1,0 +1,6 @@
+---
+- name: Install Docker
+  hosts: all
+  gather_facts: true
+  roles:
+    - { role: roles/docker_install }

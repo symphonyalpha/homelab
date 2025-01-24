@@ -1,0 +1,66 @@
+---
+- name: Create LXC Container
+  community.general.proxmox:
+    vmid: "{{ lxc_vmid }}"
+    # api_user: ansible@pam
+    # api_token_id: "{{ token_id }}"
+    # api_token_secret: "{{ token_secret }}"
+    api_user: root@pam
+    api_password: proxmox@password1sd@b3st
+    api_host: 192.168.2.150    # Proxmox hostname
+    node: pve-raiden    # Name of Proxmox host
+    hostname: "{{ lxc_hostname }}"    # container name
+    password: "{{ lxc_password }}"    # root password
+    cores: 1
+    cpus: 1
+    ostemplate: "local:vztmpl/debian-12-standard_12.7-1_amd64.tar.zst"
+    storage: local-lvm
+    netif:
+      net0: "name=eth0,gw=192.168.2.1,ip={{ lxc_ip }},bridge=vmbr0"
+    pubkey: "{{ ssh_key }}"
+    timezone: Asia/Singapore
+    features:
+      - nesting=1
+      # - cpulimit=0  # unable to set this from ansible proxmox package
+      # - keyctl=1    # Only able to set this as root
+
+# Added here until I figure out how to share the `lxc_vmid` value across plays
+- name: Add mountpoints for Docker
+  ansible.builtin.blockinfile:
+    dest: "/etc/pve/lxc/{{ lxc_vmid }}.conf"
+    block: |
+      mp0: /zfs-pool/docker,mp=/docker
+      mp1: /zfs-pool/data,mp=/data
+
+# - name: Add mountpoints for data files
+#   ansible.builtin.blockinfile:
+#     dest: "/etc/pve/lxc/{{ lxc_vmid }}.conf"
+#     block: |
+#       mp0: /zfs-pool/data,mp=/data
+
+- name: Add features
+  ansible.builtin.lineinfile:
+    path: "/etc/pve/lxc/{{ lxc_vmid }}.conf"
+    search_string: "features: nesting=1"
+    line: "features: keyctl=1,nesting=1"
+
+- name: Remove cpulimit
+  ansible.builtin.lineinfile:
+    path: "/etc/pve/lxc/{{ lxc_vmid }}.conf"
+    search_string: "cpulimit"
+    state: absent
+
+- name: Start created LXC container
+  community.general.proxmox:
+    api_user: ansible@pam
+    api_token_id: "{{ token_id }}"
+    api_token_secret: "{{ token_secret }}"
+    api_host: 192.168.2.150    # Proxmox hostname
+    node: pve-raiden    # Name of Proxmox host
+    vmid: "{{ lxc_vmid }}"
+    state: started
+
+- name: Add LXC to in-memory (temp) inventory list
+  ansible.builtin.add_host:
+    hostname: "{{ lxc_ip.split('/')[0] }}"
+    groups: new

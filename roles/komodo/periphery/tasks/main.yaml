@@ -1,0 +1,41 @@
+---
+- name: Get the latest binary version
+  ansible.builtin.uri:
+    url: "https://api.github.com/repos/mbecker20/komodo/releases/latest"
+    return_content: true
+  register: latest
+
+- name: Download latest binary
+  ansible.builtin.get_url:
+    url: "https://github.com/mbecker20/komodo/releases/download/{{ latest.json.tag_name }}/periphery-x86_64"
+    dest: "/usr/local/bin/periphery"
+    mode: '0755'
+
+- name: Ensure config directory
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0755'
+  loop:
+    - "{{ komodo_directory }}"
+    - "{{ komodo_directory }}/repos"
+    - "{{ komodo_directory }}/stacks"
+
+- name: Download config
+  ansible.builtin.get_url:
+    url: https://gitea.symphonyalpha.me/symphonyalpha/komodo/raw/branch/master/periphery.config.toml
+    dest: "{{ komodo_directory }}/periphery.config.toml"
+    mode: '0644'
+
+- name: Download service file
+  ansible.builtin.get_url:
+    url: https://gitea.symphonyalpha.me/symphonyalpha/komodo/raw/branch/master/periphery.system
+    dest: "/etc/systemd/system/periphery.service"
+    mode: '0644'
+
+- name: Start Periphery
+  ansible.builtin.systemd:
+    name: periphery
+    state: started
+    enabled: true
+    daemon_reload: true

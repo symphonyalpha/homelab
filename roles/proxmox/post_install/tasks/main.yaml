@@ -1,0 +1,30 @@
+---
+- name: Install sudo package
+  ansible.builtin.apt:
+    name: sudo
+    update_cache: yes
+    state: latest
+
+- name: Create Ansible user
+  ansible.builtin.user:
+    name: "{{ ansible_user }}"
+    shell: '/bin/bash'
+
+- name: Add ansible to sudoers
+  community.general.sudoers:
+    name: ansible
+    user: "{{ ansible_user }}"
+    state: present
+    nopassword: true
+    commands: ALL
+
+- name: Add Ansible SSH key
+  ansible.posix.authorized_key:
+    user: "{{ ansible_user }}"
+    key: "{{ ansible_ssh_key }}"
+
+- name: Install proxmoxer
+  ansible.builtin.apt:
+    name: python3-proxmoxer
+    state: latest
+    update_cache: yes

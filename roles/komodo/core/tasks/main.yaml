@@ -1,0 +1,23 @@
+---
+- name: Ensure Compose directory
+  ansible.builtin.file:
+    path: "{{ komodo_root }}"
+    state: directory
+    mode: '0755'
+
+- name: Download Compose file
+  ansible.builtin.get_url:
+    url: https://gitea.symphonyalpha.me/symphonyalpha/komodo/raw/branch/master/compose.yml
+    dest: "{{ komodo_root }}"
+    mode: '0644'
+
+- name: Download .env file
+  ansible.builtin.get_url:
+    url: https://gitea.symphonyalpha.me/symphonyalpha/komodo/raw/branch/master/komodo.env
+    dest: "{{ komodo_root }}"
+    mode: '0644'
+
+- name: Start container
+  community.docker.docker_compose_v2:
+    project_src: "{{ komodo_root }}"
+    state: present
