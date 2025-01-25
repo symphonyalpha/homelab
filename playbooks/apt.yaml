@@ -1,0 +1,11 @@
+---
+- name: Update and upgrade apt packages
+  hosts: all
+  become: true
+
+  tasks:
+    - name: Update and upgrade apt packages
+      become: true
+      ansible.builtin.apt:
+        upgrade: true
+        update_cache: true

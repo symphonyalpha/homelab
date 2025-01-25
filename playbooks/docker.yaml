@@ -3,4 +3,10 @@
   hosts: all
   gather_facts: true
   roles:
-    - { role: ../roles/docker_install }
+    - { role: ../roles/docker }
+
+- name: Setup Komodo
+  hosts: all
+  roles:
+    - { role: ../roles/komodo/core }
+    - { role: ../roles/komodo/periphery }
