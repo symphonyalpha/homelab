@@ -1,31 +1,33 @@
 locals {
-  lxc_hostname = "testing"
-  lxc_vmid = 150
-  ip = "192.168.2.200/24"
-  ssh_key = "./secrets/id_ed25519.pub"
+  lxc_hostname       = "testing"
+  lxc_vmid           = 150
+  ip                 = "192.168.2.200/24"
+  ssh_key            = "../secrets/id_ed25519.pub"
+  ssh_priv_key       = "../secrets/id_ed25519"
+  playbook_directory = "../playbooks"
 }
 
 terraform {
   required_providers {
     proxmox = {
-      source = "Telmate/proxmox"
+      source  = "Telmate/proxmox"
       version = "3.0.1-rc4"
     }
     ansible = {
-      source = "ansible/ansible"
+      source  = "ansible/ansible"
       version = "1.3.0"
     }
   }
-  
+
 }
 
 provider "proxmox" {
-  pm_api_url          = "https://pve-raiden.symphonyalpha.me/api2/json"
-  pm_user             = "root@pam"
-  pm_password         = var.proxmox_password
+  pm_api_url  = "https://pve-raiden.symphonyalpha.me/api2/json"
+  pm_user     = "root@pam"
+  pm_password = var.proxmox_password
 }
 
-resource "proxmox_lxc" "test_lxc" {
+resource "proxmox_lxc" "create_lxc" {
   target_node  = "pve-raiden"
   hostname     = local.lxc_hostname
   password     = var.lxc_password
@@ -36,9 +38,9 @@ resource "proxmox_lxc" "test_lxc" {
   memory       = 512
   swap         = 512
 
-  start        = true
+  start           = true
   ssh_public_keys = file(local.ssh_key)
-  tags         = "ansible"
+  tags            = "ansible"
 
   features {
     keyctl  = true
@@ -70,26 +72,29 @@ resource "proxmox_lxc" "test_lxc" {
 }
 
 resource "ansible_host" "ansible_inventory" {
-  depends_on = [proxmox_lxc.test_lxc]
-  name = "test_lxc"
-  groups = ["test"]
+  depends_on = [proxmox_lxc.create_lxc]
+  name       = "docker"
+  groups     = ["docker"]
 
   variables = {
-    ansible_host = "${split("/", local.ip)[0]}"
+    ansible_host                 = "${split("/", local.ip)[0]}"
+    ansible_user                 = "root"
+    ansible_ssh_private_key_file = "${local.ssh_priv_key}"
   }
 }
 
-resource "null_resource" "run_ansible" {
+resource "null_resource" "test_ssh" {
   depends_on = [ansible_host.ansible_inventory]
 
   provisioner "local-exec" {
     command     = "until nc -zv ${split("/", local.ip)[0]} 22; do echo 'Waiting for SSH to be available...'; sleep 5; done"
     working_dir = path.module
   }
+}
 
-  provisioner "local-exec" {
-    command = <<EOT
-    ansible-playbook -i terraform.yaml ansible-proxmox.yaml
-    EOT
-  }
+resource "ansible_playbook" "run_playbook" {
+  depends_on = [null_resource.test_ssh]
+
+  playbook = "${local.playbook_directory}/docker.yaml"
+  name     = split("/", local.ip)[0]
 }
