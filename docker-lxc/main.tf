@@ -1,7 +1,11 @@
 locals {
-  lxc_hostname       = "testing"
-  lxc_vmid           = 150
-  ip                 = "192.168.2.200/24"
+  lxc_hostname       = "docker"
+  lxc_vmid           = 101
+  lxc_cores          = 2
+  lxc_memory         = 4096
+  ip                 = "192.168.2.151/24"
+  ansible_group      = "docker"
+
   ssh_key            = "../secrets/id_ed25519.pub"
   ssh_priv_key       = "../secrets/id_ed25519"
   playbook_directory = "../playbooks"
@@ -34,9 +38,9 @@ resource "proxmox_lxc" "create_lxc" {
   vmid         = local.lxc_vmid
   ostemplate   = "local:vztmpl/debian-12-standard_12.7-1_amd64.tar.zst"
   unprivileged = true
-  cores        = 1
-  memory       = 512
-  swap         = 512
+  cores        = local.lxc_cores
+  memory       = local.lxc_memory
+  swap         = local.lxc_memory
 
   start           = true
   ssh_public_keys = file(local.ssh_key)
@@ -50,7 +54,7 @@ resource "proxmox_lxc" "create_lxc" {
   // Terraform will crash without rootfs defined
   rootfs {
     storage = "local-lvm"
-    size    = "20G"
+    size    = "30G"
   }
 
   // NFS share mounted on host
@@ -60,6 +64,15 @@ resource "proxmox_lxc" "create_lxc" {
     storage = "/zfs-pool/docker"
     volume  = "/zfs-pool/docker"
     mp      = "/docker"
+    size    = "1G"
+  }
+
+  mountpoint {
+    slot    = "1"
+    key     = "1"
+    storage = "/zfs-pool/data"
+    volume  = "/zfs-pool/data"
+    mp      = "/data"
     size    = "1G"
   }
 
@@ -74,12 +87,12 @@ resource "proxmox_lxc" "create_lxc" {
 resource "ansible_host" "ansible_inventory" {
   depends_on = [proxmox_lxc.create_lxc]
   name       = "docker"
-  groups     = ["docker"]
+  groups     = ["${local.ansible_group}"]
 
   variables = {
     ansible_host                 = "${split("/", local.ip)[0]}"
     ansible_user                 = "root"
-    ansible_ssh_private_key_file = "${local.ssh_priv_key}"
+    ansible_ssh_private_key_file = local.ssh_priv_key
   }
 }
 

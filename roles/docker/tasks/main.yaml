@@ -38,8 +38,3 @@
   ansible.builtin.systemd_service:
     name: docker
     state: started
-
-# - name: Setup Docker directory
-#   ansible.builtin.file:
-#     path: "{{ docker_compose_files_directory }}"
-#     state: directory
