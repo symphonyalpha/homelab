@@ -1,0 +1,84 @@
+---
+- name: Perform post provisioning tasks
+  hosts: all
+  become: true
+
+  vars:
+    ansible_id: 1001
+    jaewhy_id: 1002
+  vars_files:
+    - ../group_vars/vault.yml
+
+  tasks:
+  - name: Update APT cache
+    ansible.builtin.apt:
+      update_cache: true
+      cache_valid_time: 1200
+
+  - name: Upgrade all packages
+    ansible.builtin.apt:
+      upgrade: dist
+
+  - name: Autoclean APT cache
+    ansible.builtin.apt:
+      autoclean: true
+
+  - name: Autoremove unused packages
+    ansible.builtin.apt:
+      autoremove: true
+
+  - name: Install packages
+    ansible.builtin.apt:
+      name: "{{ item }}"
+      state: latest
+    loop:
+      - sudo
+      - curl
+      - wget
+
+  - name: Ensure ansible group exists with fixed GID
+    ansible.builtin.group:
+      name: ansible
+      gid: "{{ ansible_id }}"
+      state: present
+
+  - name: Create ansible user
+    ansible.builtin.user:
+      name: ansible
+      shell: /bin/bash
+      uid: "{{ ansible_id }}"
+      group: ansible    # sets user's default group
+      groups: sudo      # appends user to this group
+      append: yes
+      create_home: yes
+
+  - name: Allow ansible user to run sudo without password
+    ansible.builtin.copy:
+      dest: /etc/sudoers.d/ansible
+      content: "ansible ALL=(ALL) NOPASSWD:ALL"
+      mode: "0440"
+
+  - name: Add SSH key for ansible user
+    ansible.posix.authorized_key:
+      user: ansible
+      state: present
+      key: "{{ lookup('file', '../secrets/id_ed25519.pub') }}"
+
+  - name: Ensure jaewhy group exists with fixed GID
+    ansible.builtin.group:
+      name: jaewhy
+      gid: "{{ jaewhy_id }}"
+      state: present
+
+  - name: Create jaewhy user account
+    ansible.builtin.user:
+      name: jaewhy
+      shell: /bin/bash
+      uid: "{{ jaewhy_id }}"
+      ## requires downloading passlib module using `pip install passlib`
+      password: "{{ jaewhy_password | password_hash('sha512')  }}"
+      update_password: on_create
+      group: jaewhy
+      groups: sudo
+      append: yes
+      create_home: yes
